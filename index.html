@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Personal Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+
+        .card { background: #18181b; border: 1px solid #27272a; }
+        .value-box { background: #27272a; border: 1px solid #3f3f46; }
+
+        /* ── Overlay ── */
+        #overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0);
+            z-index: 40;
+            pointer-events: none;
+            transition: background 0.35s ease;
+        }
+        #overlay.show {
+            background: rgba(0,0,0,0.55);
+            pointer-events: all;
+        }
+
+        /* ── Sidebar ── */
+        #sidebar {
+            position: fixed; top: 0; right: 0; height: 100%;
+            width: 300px;
+            background: #09090b;
+            border-left: 1px solid #1f1f23;
+            z-index: 50;
+            display: flex; flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+                        box-shadow 0.38s ease;
+            box-shadow: none;
+            will-change: transform;
+        }
+        #sidebar.open {
+            transform: translateX(0);
+            box-shadow: -20px 0 60px rgba(0,0,0,0.6);
+        }
+
+        /* ── Vertical nav list ── */
+        #nav-list {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 0.5rem 0.6rem;
+        }
+        #nav-list::-webkit-scrollbar { width: 3px; }
+        #nav-list::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+        .nav-item {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.72rem 0.75rem; border-radius: 0.65rem;
+            cursor: pointer; margin-bottom: 0.15rem;
+            transition: background 0.15s, color 0.15s;
+            color: #a1a1aa;
+        }
+        .nav-item:hover { background: #18181b; color: #e4e4e7; }
+        .nav-item:hover .nav-chevron { opacity: 1; }
+        .nav-icon {
+            width: 2rem; height: 2rem; border-radius: 0.5rem;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .nav-label { flex: 1; font-size: 13px; font-weight: 500; }
+        .nav-desc   { font-size: 10.5px; color: #52525b; margin-top: 1px; }
+        .nav-chevron {
+            opacity: 0.4; transition: opacity 0.15s, transform 0.15s;
+            flex-shrink: 0;
+        }
+        .nav-item:hover .nav-chevron { transform: translateX(2px); }
+
+        /* ── Section panel (drilled in) ── */
+        #section-panel {
+            position: absolute; inset: 0;
+            background: #09090b;
+            display: flex; flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+            will-change: transform;
+            z-index: 2;
+        }
+        #section-panel.open { transform: translateX(0); }
+
+        #sidebar { overflow: hidden; } /* needed for panel slide */
+
+        .section-header {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.85rem 0.75rem 0.75rem;
+            border-bottom: 1px solid #1f1f23;
+            flex-shrink: 0;
+        }
+        .back-btn {
+            width: 1.9rem; height: 1.9rem; border-radius: 0.45rem;
+            display: flex; align-items: center; justify-content: center;
+            color: #71717a; background: #18181b; border: 1px solid #27272a;
+            flex-shrink: 0; transition: background 0.15s, color 0.15s;
+            cursor: pointer;
+        }
+        .back-btn:hover { background: #27272a; color: #e4e4e7; }
+
+        /* ── Section content scrollable area ── */
+        #section-content {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 0.85rem 0.75rem;
+            display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        #section-content::-webkit-scrollbar { width: 3px; }
+        #section-content::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+        .tab-panel {
+            display: flex; flex-direction: column; gap: 0.5rem;
+            animation: panelIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+        @keyframes panelIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Import / Export action cards ── */
+        .action-card {
+            background: #18181b; border: 1px solid #27272a;
+            border-radius: 0.85rem; padding: 0.85rem 0.9rem;
+            display: flex; align-items: center; gap: 0.85rem;
+            cursor: pointer; transition: border-color 0.15s, background 0.15s;
+        }
+        .action-card:hover { border-color: #3f3f46; background: #1c1c1f; }
+        .action-card.danger:hover { border-color: #7f1d1d; background: #1c1010; }
+        .action-icon {
+            width: 2.2rem; height: 2.2rem; border-radius: 0.55rem;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .action-title { font-size: 12.5px; font-weight: 600; color: #e4e4e7; }
+        .action-desc  { font-size: 10.5px; color: #52525b; margin-top: 1px; }
+
+        /* ── Sidebar field rows ── */
+        .sb-field {
+            background: #18181b; border: 1px solid #27272a;
+            border-radius: 0.75rem; padding: 0.65rem 0.75rem;
+            transition: border-color 0.15s;
+        }
+        .sb-field:hover { border-color: #3f3f46; }
+
+        .sb-input {
+            background: #27272a; border: 1px solid #3f3f46;
+            color: white; outline: none; border-radius: 0.45rem;
+            padding: 0.3rem 0.65rem; font-size: 12.5px; font-weight: 500; width: 100%;
+            transition: border-color 0.15s;
+        }
+        .sb-input:focus { border-color: #0ea5e9; }
+
+        /* ── Icon buttons ── */
+        .icon-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 1.9rem; height: 1.9rem; border-radius: 0.45rem; flex-shrink: 0;
+            color: white; transition: background 0.15s, transform 0.12s;
+        }
+        .btn-save   { background: #22c55e; } .btn-save:hover   { background: #16a34a; transform: scale(1.05); }
+        .btn-cancel { background: #3f3f46; } .btn-cancel:hover { background: #52525b; }
+        .btn-del    { background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa; }
+        .btn-del:hover { background: #ef4444; border-color: #ef4444; color: white; transform: scale(1.05); }
+
+        /* ── Copy button ── */
+        .copy-btn {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            background: #0ea5e9; color: white;
+            padding: 0.35rem 0.8rem; border-radius: 0.5rem;
+            font-size: 12px; font-weight: 600; flex-shrink: 0;
+            transition: background 0.15s, transform 0.12s;
+        }
+        .copy-btn:hover { background: #0284c8; transform: translateY(-1px); }
+
+        /* ── Hamburger ── */
+        #menu-btn {
+            position: fixed; right: 1.1rem; top: 1.05rem; z-index: 30;
+            width: 2.2rem; height: 2.2rem;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+            border-radius: 0.5rem; background: #18181b; border: 1px solid #27272a;
+            cursor: pointer; transition: background 0.15s, border-color 0.15s;
+        }
+        #menu-btn:hover { background: #27272a; border-color: #3f3f46; }
+        #menu-btn span {
+            display: block; width: 16px; height: 1.5px; background: #a1a1aa;
+            border-radius: 2px;
+            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1),
+                        opacity 0.2s ease, width 0.2s ease;
+            transform-origin: center;
+        }
+        #menu-btn.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+        #menu-btn.open span:nth-child(2) { opacity: 0; width: 0; }
+        #menu-btn.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed; bottom: 1.5rem; left: 50%;
+            transform: translateX(-50%) translateY(12px);
+            color: white; padding: 0.45rem 1.1rem;
+            border-radius: 999px; font-size: 12.5px; font-weight: 500;
+            opacity: 0; transition: opacity 0.22s ease, transform 0.22s ease;
+            pointer-events: none; z-index: 999;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ── Drag handle ── */
+        .drag-handle {
+            display: flex; align-items: center; justify-content: center;
+            width: 1.35rem; flex-shrink: 0;
+            cursor: grab; color: #3f3f46;
+            transition: color 0.15s;
+            padding: 0.1rem 0;
+            touch-action: none;
+            user-select: none;
+        }
+        .drag-handle:hover { color: #71717a; }
+
+        /* ghost card that follows the pointer */
+        .drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 200;
+            left: 0; top: 0;
+            width: 252px;
+            background: #27272a;
+            border: 1.5px solid #0ea5e9;
+            border-radius: 0.75rem;
+            padding: 0.65rem 0.75rem;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(14,165,233,0.15);
+            opacity: 0;
+            transition: opacity 0.12s ease;
+            will-change: transform;
+        }
+        .drag-ghost.visible { opacity: 1; }
+
+        /* placeholder that holds space while dragging */
+        .drag-placeholder {
+            border-radius: 0.75rem;
+            background: transparent;
+            border: 1.5px dashed #0ea5e960;
+            transition: height 0.18s cubic-bezier(0.4,0,0.2,1);
+            flex-shrink: 0;
+        }
+
+        /* cards shift smoothly out of the way */
+        .sb-field {
+            transition: border-color 0.15s, transform 0.2s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease;
+        }
+        .sb-field.is-dragging-src {
+            opacity: 0.3;
+        }
+
+        /* ── Delete confirmation card ── */
+        .del-confirm-overlay {
+            position: fixed;
+            top: 0; right: 0;
+            width: 300px; height: 100%;
+            background: rgba(9,9,11,0.85);
+            backdrop-filter: blur(4px);
+            z-index: 60;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .del-confirm-overlay.visible {
+            opacity: 1; pointer-events: all;
+        }
+        .del-confirm-card {
+            background: #18181b; border: 1px solid #3f3f46;
+            border-radius: 0.75rem; padding: 1rem 1rem 0.9rem;
+            width: calc(100% - 1.5rem);
+            transform: scale(0.92) translateY(6px);
+            transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .del-confirm-overlay.visible .del-confirm-card {
+            transform: scale(1) translateY(0);
+        }
+        .btn-confirm-del {
+            flex: 1; padding: 0.42rem 0; border-radius: 0.45rem;
+            font-size: 12px; font-weight: 600; color: white;
+            background: #ef4444;
+            transition: background 0.15s, transform 0.12s;
+        }
+        .btn-confirm-del:hover { background: #dc2626; transform: translateY(-1px); }
+        .btn-confirm-cancel {
+            flex: 1; padding: 0.42rem 0; border-radius: 0.45rem;
+            font-size: 12px; font-weight: 600; color: #a1a1aa;
+            background: #27272a; border: 1px solid #3f3f46;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-confirm-cancel:hover { background: #3f3f46; color: #e4e4e7; }
+
+        /* ── Hidden tab ── */
+        .pill-btn {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.38rem 0.85rem; border-radius: 999px;
+            font-size: 12px; font-weight: 600;
+            border: 1.5px dashed #3f3f46; color: #71717a;
+            background: transparent;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+            cursor: pointer;
+        }
+        .pill-btn:hover { border-color: #71717a; color: #a1a1aa; background: #1f1f23; }
+
+        /* three-dot menu */
+        .dots-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 1.6rem; height: 1.6rem; border-radius: 0.4rem; flex-shrink: 0;
+            color: #52525b; background: transparent;
+            transition: background 0.15s, color 0.15s;
+            position: relative;
+        }
+        .dots-btn:hover { background: #27272a; color: #a1a1aa; }
+
+        .dots-menu {
+            position: absolute; top: calc(100% + 4px); right: 0;
+            background: #18181b; border: 1px solid #3f3f46;
+            border-radius: 0.55rem; padding: 0.3rem;
+            z-index: 100; min-width: 148px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            opacity: 0; transform: scale(0.93) translateY(-4px);
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1);
+            transform-origin: top right;
+        }
+        .dots-menu.open { opacity: 1; transform: scale(1) translateY(0); pointer-events: all; }
+        .dots-menu button {
+            width: 100%; display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.42rem 0.6rem; border-radius: 0.4rem;
+            font-size: 12px; font-weight: 500; color: #a1a1aa;
+            transition: background 0.12s, color 0.12s; text-align: left;
+        }
+        .dots-menu button:hover { background: #27272a; color: #e4e4e7; }
+
+        /* hidden field card in sidebar */
+        .hidden-field-card {
+            background: #18181b; border: 1px solid #27272a;
+            border-radius: 0.75rem; padding: 0.6rem 0.65rem;
+            display: flex; align-items: center; gap: 0.6rem;
+            transition: border-color 0.15s;
+        }
+        .hidden-field-card:hover { border-color: #3f3f46; }
+
+        /* picker overlay */
+        .field-picker-overlay {
+            position: fixed; top: 0; right: 0;
+            width: 300px; height: 100%;
+            background: rgba(9,9,11,0.88);
+            backdrop-filter: blur(4px);
+            z-index: 65;
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.22s ease;
+        }
+        .field-picker-overlay.visible { opacity: 1; pointer-events: all; }
+        .picker-card {
+            margin: auto 0.75rem;
+            background: #18181b; border: 1px solid #3f3f46;
+            border-radius: 0.85rem; overflow: hidden;
+            transform: translateY(10px) scale(0.96);
+            transition: transform 0.22s cubic-bezier(0.34,1.3,0.64,1);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+        }
+        .field-picker-overlay.visible .picker-card { transform: translateY(0) scale(1); }
+        .picker-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.6rem 0.85rem; gap: 0.5rem;
+            border-bottom: 1px solid #27272a; cursor: pointer;
+            transition: background 0.12s;
+        }
+        .picker-item:last-child { border-bottom: none; }
+        .picker-item:hover { background: #27272a; }
+
+        /* hidden field copy btn — smaller variant */
+        .copy-btn-sm {
+            display: inline-flex; align-items: center; gap: 0.28rem;
+            background: #1e3a4a; color: #7dd3fc;
+            padding: 0.28rem 0.6rem; border-radius: 0.4rem;
+            font-size: 11px; font-weight: 600; flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .copy-btn-sm:hover { background: #164e63; }
+
+        /* Add form wide save button */
+        .wide-btn {
+            width: 100%; display: flex; align-items: center; justify-content: center;
+            gap: 0.4rem; padding: 0.55rem; border-radius: 0.55rem;
+            font-size: 12.5px; font-weight: 600; color: white;
+            transition: background 0.15s, transform 0.12s;
+        }
+        .wide-btn.add  { background: #22c55e; } .wide-btn.add:hover  { background: #16a34a; transform: translateY(-1px); }
+        .wide-btn.clr  { background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa; }
+        .wide-btn.clr:hover  { background: #3f3f46; color: #e4e4e7; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen py-5">
+
+    <!-- Overlay -->
+    <div id="overlay" onclick="closeSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+
+        <!-- Sidebar Header (always visible) -->
+        <div class="flex items-center justify-between px-4 py-3.5" style="border-bottom:1px solid #1f1f23;flex-shrink:0;">
+            <span class="text-sm font-semibold text-zinc-200 tracking-tight">Manage Fields</span>
+        </div>
+
+        <!-- Nav list (home screen) -->
+        <div id="nav-list">
+            <div class="nav-item" onclick="openSection('edit')">
+                <div class="nav-icon" style="background:#1a2e1a;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#4ade80" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.5 19.213l-4.5 1 1-4.5 12.862-12.226z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Edit Fields</div>
+                    <div class="nav-desc">Update values &amp; reorder</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="nav-item" onclick="openSection('add')">
+                <div class="nav-icon" style="background:#1a2535;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#60a5fa" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Add Field</div>
+                    <div class="nav-desc">Create a new field</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="nav-item" onclick="openSection('delete')">
+                <div class="nav-icon" style="background:#2a1a1a;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#f87171" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 011-1h4a1 1 0 011 1M3 7h18"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Delete Field</div>
+                    <div class="nav-desc">Remove fields permanently</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="nav-item" onclick="openSection('hidden')">
+                <div class="nav-icon" style="background:#1e1a2e;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#a78bfa" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Hidden Fields</div>
+                    <div class="nav-desc">Manage visibility</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+
+            <div style="height:1px;background:#1f1f23;margin:0.4rem 0.25rem;"></div>
+
+            <div class="nav-item" onclick="openSection('import')">
+                <div class="nav-icon" style="background:#1a2535;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#38bdf8" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Import Data</div>
+                    <div class="nav-desc">Load fields from JSON file</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="nav-item" onclick="openSection('export')">
+                <div class="nav-icon" style="background:#1a2820;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#34d399" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0l-4 4m4-4l4 4"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="nav-label">Export Data</div>
+                    <div class="nav-desc">Save fields as JSON file</div>
+                </div>
+                <svg class="nav-chevron w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </div>
+        </div>
+
+        <!-- Section panel (slides in over nav list) -->
+        <div id="section-panel">
+            <div class="section-header">
+                <button class="back-btn" onclick="closeSection()" title="Back">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span id="section-title" class="text-sm font-semibold text-zinc-200 tracking-tight"></span>
+            </div>
+            <div id="section-content"></div>
+        </div>
+
+        <!-- Hidden file input for import -->
+        <input type="file" id="json-file-input" accept=".json" style="display:none;" onchange="handleJsonImport(event)">
+    </div>
+
+    <!-- Hamburger -->
+    <button id="menu-btn" onclick="toggleSidebar()">
+        <span></span><span></span><span></span>
+    </button>
+
+    <!-- Main -->
+    <div class="max-w-2xl mx-auto px-4">
+        <div class="text-center mb-6">
+            <h1 class="text-xl font-semibold tracking-tight">Personal Information</h1>
+        </div>
+        <div class="space-y-2" id="info-container"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const STORAGE_KEY = 'personal_details_v3';
+        let currentSection = null;
+        let sidebarOpen = false;
+
+        const defaultData = [
+            { label: "Full Name",       value: "Mahesh Kariyala",             id: "name",     hidden: false },
+            { label: "Email Address",   value: "maheshkariyala99@gmail.com",  id: "email",    hidden: false },
+            { label: "Phone Number",    value: "5485778884",                  id: "phone",    hidden: false },
+            { label: "Full Address",    value: "932 Janette Ave",             id: "address",  hidden: false },
+            { label: "Postal Code",     value: "N9A 5A1",                     id: "zipcode",  hidden: false },
+            { label: "SIN",             value: "976169565",                   id: "sin",      hidden: false },
+            { label: "Passport Number", value: "Y8202525",                    id: "passport", hidden: false }
+        ];
+
+        /* ── Storage ── */
+        function loadData() {
+            try {
+                const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if (s && Array.isArray(s.fields)) return s.fields.map(f => ({ hidden: false, ...f }));
+            } catch {}
+            return defaultData.map(d => ({ ...d }));
+        }
+        function saveAll(fields) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ fields }));
+        }
+        function loadImportedFlag() {
+            try { return !!JSON.parse(localStorage.getItem(STORAGE_KEY + '_imported')); } catch { return false; }
+        }
+        function setImportedFlag(val) {
+            localStorage.setItem(STORAGE_KEY + '_imported', JSON.stringify(val));
+        }
+
+        /* ── Toast ── */
+        function showToast(msg, color = '#22c55e') {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.style.background = color;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        /* ── Sidebar ── */
+        function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }
+        function openSidebar() {
+            sidebarOpen = true;
+            closeSection(false); // always land on nav list
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('menu-btn').classList.add('open');
+        }
+        function closeSidebar() {
+            sidebarOpen = false;
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('menu-btn').classList.remove('open');
+        }
+
+        /* ── Section nav ── */
+        const sectionMeta = {
+            edit:   { title: 'Edit Fields' },
+            add:    { title: 'Add Field' },
+            delete: { title: 'Delete Field' },
+            hidden: { title: 'Hidden Fields' },
+            import: { title: 'Import Data' },
+            export: { title: 'Export Data' },
+        };
+
+        function openSection(name) {
+            currentSection = name;
+            document.getElementById('section-title').textContent = sectionMeta[name].title;
+            document.getElementById('section-panel').classList.add('open');
+            renderSection(name);
+        }
+
+        function closeSection(animate = true) {
+            currentSection = null;
+            const panel = document.getElementById('section-panel');
+            if (animate) {
+                panel.classList.remove('open');
+            } else {
+                // instant reset without transition
+                panel.style.transition = 'none';
+                panel.classList.remove('open');
+                requestAnimationFrame(() => { panel.style.transition = ''; });
+            }
+            closeAllDotMenus();
+        }
+
+        function renderSection(name) {
+            const content = document.getElementById('section-content');
+            content.innerHTML = '';
+            if      (name === 'edit')   renderEditSection(content);
+            else if (name === 'add')    renderAddSection(content);
+            else if (name === 'delete') renderDeleteSection(content);
+            else if (name === 'hidden') renderHiddenSection(content);
+            else if (name === 'import') renderImportSection(content);
+            else if (name === 'export') renderExportSection(content);
+        }
+
+        /* ══════════════════════════════
+           EDIT SECTION
+        ══════════════════════════════ */
+        function renderEditSection(content) {
+            const allFields = loadData();
+            const fields = allFields.filter(f => !f.hidden);
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.id = 'edit-panel';
+            panel.style.cssText = 'display:flex;flex-direction:column;gap:0.5rem;position:relative;';
+
+            if (!fields.length) {
+                panel.innerHTML = '<p class="text-zinc-600 text-xs text-center mt-6">No visible fields to edit.</p>';
+                content.appendChild(panel); return;
+            }
+
+            fields.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'sb-field';
+                row.dataset.id = item.id;
+                row.innerHTML = `
+                    <p class="text-zinc-500 text-[10.5px] font-medium mb-1.5 uppercase tracking-wide">${escHtml(item.label)}</p>
+                    <div class="flex gap-2 items-center">
+                        <div class="drag-handle" title="Drag to reorder">
+                            <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                                <circle cx="2.5" cy="2"  r="1.3"/><circle cx="7.5" cy="2"  r="1.3"/>
+                                <circle cx="2.5" cy="6"  r="1.3"/><circle cx="7.5" cy="6"  r="1.3"/>
+                                <circle cx="2.5" cy="10" r="1.3"/><circle cx="7.5" cy="10" r="1.3"/>
+                                <circle cx="2.5" cy="14" r="1.3"/><circle cx="7.5" cy="14" r="1.3"/>
+                            </svg>
+                        </div>
+                        <input id="sb-edit-${item.id}" class="sb-input" type="text" value="${escHtml(item.value)}"
+                               onkeydown="if(event.key==='Enter') sbSaveEdit('${item.id}');" />
+                        <button onclick="sbSaveEdit('${item.id}')" class="icon-btn btn-save" title="Save">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </button>
+                    </div>`;
+                const handle = row.querySelector('.drag-handle');
+                handle.addEventListener('pointerdown', e => startDrag(e, row, panel));
+                panel.appendChild(row);
+            });
+            content.appendChild(panel);
+        }
+
+        /* ── Smooth pointer drag ── */
+        let dragState = null;
+
+        function startDrag(e, srcRow, panel) {
+            e.preventDefault();
+            const srcRect = srcRow.getBoundingClientRect();
+            const offsetY = e.clientY - srcRect.top;
+            const offsetX = e.clientX - srcRect.left;
+            const ghost = document.createElement('div');
+            ghost.className = 'drag-ghost';
+            ghost.innerHTML = srcRow.innerHTML;
+            ghost.style.width = srcRect.width + 'px';
+            document.body.appendChild(ghost);
+            const placeholder = document.createElement('div');
+            placeholder.className = 'drag-placeholder';
+            placeholder.style.height = srcRect.height + 'px';
+            srcRow.classList.add('is-dragging-src');
+            srcRow.after(placeholder);
+            positionGhost(ghost, e.clientX - offsetX, e.clientY - offsetY);
+            requestAnimationFrame(() => ghost.classList.add('visible'));
+            dragState = { srcRow, ghost, placeholder, panel, offsetX, offsetY };
+            const onMove = ev => onDragMove(ev);
+            const onUp   = ev => endDrag(ev);
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup',   onUp);
+            dragState.cleanup = () => {
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup',   onUp);
+            };
+        }
+
+        function positionGhost(ghost, x, y) { ghost.style.transform = `translate(${x}px, ${y}px)`; }
+
+        function onDragMove(e) {
+            if (!dragState) return;
+            const { ghost, placeholder, panel, offsetX, offsetY } = dragState;
+            positionGhost(ghost, e.clientX - offsetX, e.clientY - offsetY);
+            const rows = [...panel.querySelectorAll('.sb-field:not(.is-dragging-src)')];
+            let target = null, insertBefore = false;
+            for (const row of rows) {
+                const r = row.getBoundingClientRect();
+                if (e.clientY < r.top + r.height / 2) { target = row; insertBefore = true; break; }
+                target = row; insertBefore = false;
+            }
+            if (target) insertBefore ? target.before(placeholder) : target.after(placeholder);
+        }
+
+        function endDrag() {
+            if (!dragState) return;
+            const { srcRow, ghost, placeholder, panel, cleanup } = dragState;
+            dragState = null; cleanup();
+            const pRect = placeholder.getBoundingClientRect();
+            ghost.style.transition = 'transform 0.18s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease';
+            ghost.style.transform  = `translate(${pRect.left}px, ${pRect.top}px)`;
+            ghost.style.opacity    = '0';
+            placeholder.replaceWith(srcRow);
+            srcRow.classList.remove('is-dragging-src');
+            setTimeout(() => ghost.remove(), 200);
+            const newVisibleOrder = [...panel.querySelectorAll('.sb-field')].map(r => r.dataset.id);
+            const allFields = loadData();
+            const hiddenFields = allFields.filter(f => f.hidden);
+            const reorderedVisible = newVisibleOrder.map(id => allFields.find(f => f.id === id)).filter(Boolean);
+            saveAll([...reorderedVisible, ...hiddenFields]);
+            renderMainCards();
+        }
+
+        function sbSaveEdit(id) {
+            const inp = document.getElementById('sb-edit-' + id);
+            const newVal = inp ? inp.value.trim() : '';
+            const fields = loadData();
+            const f = fields.find(x => x.id === id);
+            if (f) f.value = newVal;
+            saveAll(fields);
+            renderMainCards();
+            showToast('Saved!');
+        }
+
+        /* ══════════════════════════════
+           ADD SECTION
+        ══════════════════════════════ */
+        function renderAddSection(content) {
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.innerHTML = `
+                <div class="sb-field flex flex-col gap-3">
+                    <div>
+                        <p class="text-zinc-500 text-[10.5px] font-medium mb-1.5 uppercase tracking-wide">Field Name</p>
+                        <input id="sb-new-label" class="sb-input" type="text" placeholder="e.g. Date of Birth" maxlength="30" />
+                    </div>
+                    <div>
+                        <p class="text-zinc-500 text-[10.5px] font-medium mb-1.5 uppercase tracking-wide">Field Value</p>
+                        <input id="sb-new-value" class="sb-input" type="text" placeholder="e.g. 01 Jan 1999"
+                               onkeydown="if(event.key==='Enter') sbConfirmAdd();" />
+                    </div>
+                    <div class="flex flex-col gap-2 pt-0.5">
+                        <button onclick="sbConfirmAdd()" class="wide-btn add">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                            </svg>
+                            Add Field
+                        </button>
+                        <button onclick="sbClearAdd()" class="wide-btn clr">Clear</button>
+                    </div>
+                </div>`;
+            content.appendChild(panel);
+            setTimeout(() => { const el = document.getElementById('sb-new-label'); if(el) el.focus(); }, 60);
+        }
+
+        function sbConfirmAdd() {
+            const label = document.getElementById('sb-new-label').value.trim();
+            const value = document.getElementById('sb-new-value').value.trim();
+            if (!label) { showToast('Field name required', '#ef4444'); document.getElementById('sb-new-label').focus(); return; }
+            if (!value) { showToast('Field value required', '#ef4444'); document.getElementById('sb-new-value').focus(); return; }
+            const fields = loadData();
+            fields.push({ label, value, id: 'custom_' + Date.now(), hidden: false });
+            saveAll(fields);
+            renderMainCards();
+            renderSection('add');
+            showToast('Field added!');
+        }
+
+        function sbClearAdd() {
+            document.getElementById('sb-new-label').value = '';
+            document.getElementById('sb-new-value').value = '';
+            document.getElementById('sb-new-label').focus();
+        }
+
+        /* ══════════════════════════════
+           DELETE SECTION
+        ══════════════════════════════ */
+        let pendingDeleteId = null;
+
+        function renderDeleteSection(content) {
+            pendingDeleteId = null;
+            const fields = loadData().filter(f => !f.hidden);
+
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.id = 'delete-panel';
+
+            if (!fields.length) {
+                panel.innerHTML = '<p class="text-zinc-600 text-xs text-center mt-6">No visible fields to delete.<br><span style="font-size:10.5px;color:#3f3f46;">Unhide fields first if needed.</span></p>';
+                wrapper.appendChild(panel); content.appendChild(wrapper); return;
+            }
+
+            fields.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'sb-field flex items-center gap-3';
+                row.innerHTML = `
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-zinc-500 text-[10.5px] font-medium uppercase tracking-wide">${escHtml(item.label)}</p>
+                        <p class="text-white text-[12.5px] font-medium truncate mt-0.5">${escHtml(item.value)}</p>
+                    </div>
+                    <button onclick="sbAskDelete('${item.id}', '${escHtml(item.label)}')" class="icon-btn btn-del" title="Remove">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 011-1h4a1 1 0 011 1M3 7h18"/>
+                        </svg>
+                    </button>`;
+                panel.appendChild(row);
+            });
+
+            const confirmOverlay = document.createElement('div');
+            confirmOverlay.className = 'del-confirm-overlay';
+            confirmOverlay.id = 'del-confirm-overlay';
+            confirmOverlay.innerHTML = `
+                <div class="del-confirm-card">
+                    <div class="flex items-start gap-2.5 mb-3">
+                        <div style="background:#ef444420;border:1px solid #ef444440;border-radius:0.45rem;padding:0.4rem;flex-shrink:0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2.2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-zinc-100 text-[12.5px] font-semibold leading-snug">Delete field?</p>
+                            <p class="text-zinc-500 text-[11px] mt-0.5 leading-snug" id="del-confirm-label">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-confirm-cancel" onclick="sbCancelDelete()">Cancel</button>
+                        <button class="btn-confirm-del" onclick="sbConfirmDelete()">
+                            <span style="display:inline-flex;align-items:center;gap:0.3rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 011-1h4a1 1 0 011 1M3 7h18"/>
+                                </svg>Delete
+                            </span>
+                        </button>
+                    </div>
+                </div>`;
+            wrapper.appendChild(panel);
+            wrapper.appendChild(confirmOverlay);
+            content.appendChild(wrapper);
+        }
+
+        function sbAskDelete(id, label) {
+            pendingDeleteId = id;
+            const overlay = document.getElementById('del-confirm-overlay');
+            const msgEl   = document.getElementById('del-confirm-label');
+            if (msgEl) msgEl.innerHTML = `Remove <span style="color:#e4e4e7;font-weight:600;">${escHtml(label)}</span>? This cannot be undone.`;
+            if (overlay) requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('visible')));
+        }
+        function sbCancelDelete() {
+            pendingDeleteId = null;
+            const overlay = document.getElementById('del-confirm-overlay');
+            if (overlay) overlay.classList.remove('visible');
+        }
+        function sbConfirmDelete() {
+            if (!pendingDeleteId) return;
+            const fields = loadData().filter(x => x.id !== pendingDeleteId);
+            pendingDeleteId = null;
+            saveAll(fields);
+            renderMainCards();
+            renderSection('delete');
+            showToast('Field deleted', '#ef4444');
+        }
+
+        /* ══════════════════════════════
+           HIDDEN SECTION
+        ══════════════════════════════ */
+        let activeDotMenu = null;
+
+        function closeAllDotMenus() {
+            document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+            activeDotMenu = null;
+        }
+        function toggleDotMenu(menuId, e) {
+            e.stopPropagation();
+            const menu = document.getElementById(menuId);
+            if (!menu) return;
+            const isOpen = menu.classList.contains('open');
+            closeAllDotMenus();
+            if (!isOpen) { menu.classList.add('open'); activeDotMenu = menu; }
+        }
+        document.addEventListener('click', () => closeAllDotMenus());
+
+        function renderHiddenSection(content) {
+            const fields  = loadData();
+            const hidden  = fields.filter(f => f.hidden);
+            const visible = fields.filter(f => !f.hidden);
+            const panel   = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.style.gap = '0.5rem';
+
+            if (hidden.length === 0) {
+                const emptyWrap = document.createElement('div');
+                emptyWrap.className = 'flex flex-col items-center gap-3 mt-8';
+                emptyWrap.innerHTML = `
+                    <div style="background:#1c1c1e;border:1px dashed #3f3f46;border-radius:0.85rem;padding:1.1rem 1rem;text-align:center;width:100%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="#3f3f46" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                        </svg>
+                        <p class="text-zinc-500 text-[11.5px] font-medium mb-0.5">No hidden fields</p>
+                        <p class="text-zinc-600 text-[10.5px]">Fields you hide won't appear on the main page</p>
+                    </div>`;
+                if (visible.length > 0) {
+                    const addBtn = document.createElement('button');
+                    addBtn.className = 'pill-btn';
+                    addBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg> Add`;
+                    addBtn.onclick = () => openFieldPicker();
+                    emptyWrap.appendChild(addBtn);
+                }
+                panel.appendChild(emptyWrap);
+            } else {
+                hidden.forEach(item => {
+                    const menuId = 'dots-menu-' + item.id;
+                    const card = document.createElement('div');
+                    card.className = 'hidden-field-card';
+                    card.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider mb-0.5">${escHtml(item.label)}</p>
+                            <p class="text-zinc-300 text-[12.5px] font-medium truncate">${escHtml(item.value)}</p>
+                        </div>
+                        <button class="copy-btn-sm" onclick="copyHiddenField('${item.id}', this)" title="Copy">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v1"></path>
+                            </svg><span>Copy</span>
+                        </button>
+                        <div style="position:relative;">
+                            <button class="dots-btn" onclick="toggleDotMenu('${menuId}', event)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
+                                </svg>
+                            </button>
+                            <div class="dots-menu" id="${menuId}">
+                                <button onclick="unhideField('${item.id}'); closeAllDotMenus();">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    Unhide this Field
+                                </button>
+                            </div>
+                        </div>`;
+                    panel.appendChild(card);
+                });
+                if (visible.length > 0) {
+                    const addRow = document.createElement('div');
+                    addRow.className = 'flex justify-center pt-1';
+                    addRow.innerHTML = `<button class="pill-btn" onclick="openFieldPicker()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                        </svg> Add</button>`;
+                    panel.appendChild(addRow);
+                }
+            }
+
+            const pickerOverlay = document.createElement('div');
+            pickerOverlay.className = 'field-picker-overlay';
+            pickerOverlay.id = 'field-picker-overlay';
+            pickerOverlay.innerHTML = buildPickerHTML(visible);
+            content.appendChild(panel);
+            content.appendChild(pickerOverlay);
+        }
+
+        function buildPickerHTML(visibleFields) {
+            if (!visibleFields.length) return '';
+            const items = visibleFields.map(f => `
+                <div class="picker-item" onclick="hideField('${f.id}')">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider">${escHtml(f.label)}</p>
+                        <p class="text-zinc-200 text-[12px] font-medium truncate">${escHtml(f.value)}</p>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7"/>
+                    </svg>
+                </div>`).join('');
+            return `<div class="picker-card">
+                <div style="padding:0.7rem 0.85rem 0.5rem;border-bottom:1px solid #27272a;display:flex;align-items:center;justify-content:space-between;">
+                    <p class="text-zinc-200 text-[12.5px] font-semibold">Select field to hide</p>
+                    <button onclick="closeFieldPicker()" style="color:#52525b;" onmouseover="this.style.color='#a1a1aa'" onmouseout="this.style.color='#52525b'">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>${items}</div>`;
+        }
+
+        function openFieldPicker() {
+            const o = document.getElementById('field-picker-overlay');
+            if (o) requestAnimationFrame(() => requestAnimationFrame(() => o.classList.add('visible')));
+        }
+        function closeFieldPicker() {
+            const o = document.getElementById('field-picker-overlay');
+            if (o) o.classList.remove('visible');
+        }
+        function hideField(id) {
+            const fields = loadData();
+            const f = fields.find(x => x.id === id);
+            if (f) f.hidden = true;
+            saveAll(fields); renderMainCards(); renderSection('hidden');
+            showToast('Field hidden', '#6366f1');
+        }
+        function unhideField(id) {
+            const fields = loadData();
+            const f = fields.find(x => x.id === id);
+            if (f) f.hidden = false;
+            saveAll(fields); renderMainCards(); renderSection('hidden');
+            showToast('Field visible again', '#22c55e');
+        }
+
+        /* ══════════════════════════════
+           IMPORT SECTION
+        ══════════════════════════════ */
+        function renderImportSection(content) {
+            const isImported = loadImportedFlag();
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.innerHTML = `
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:0.75rem;padding:0.75rem 0.85rem;margin-bottom:0.25rem;">
+                    <p class="text-zinc-400 text-[11.5px] leading-relaxed">
+                        Import a <span style="color:#38bdf8;font-weight:600;">JSON file</span> to load fields. It should be an array of objects with
+                        <code style="background:#27272a;padding:1px 5px;border-radius:3px;font-size:10.5px;">label</code>,
+                        <code style="background:#27272a;padding:1px 5px;border-radius:3px;font-size:10.5px;">value</code> and
+                        <code style="background:#27272a;padding:1px 5px;border-radius:3px;font-size:10.5px;">id</code> keys.
+                    </p>
+                </div>
+                <div class="action-card" onclick="document.getElementById('json-file-input').click()">
+                    <div class="action-icon" style="background:#1a2535;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#38bdf8" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="action-title">Import JSON File</div>
+                        <div class="action-desc">Choose a .json file from your device</div>
+                    </div>
+                    <svg class="w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="action-card danger" onclick="removeImportedData()" style="${isImported ? '' : 'opacity:0.4;pointer-events:none;'}">
+                    <div class="action-icon" style="background:#2a1a1a;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#f87171" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a1 1 0 011-1h4a1 1 0 011 1M3 7h18"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="action-title">Remove Imported File</div>
+                        <div class="action-desc">${isImported ? 'Restore default fields' : 'No imported file active'}</div>
+                    </div>
+                    ${isImported ? `<span style="background:#7f1d1d;color:#fca5a5;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;flex-shrink:0;">Active</span>` : ''}
+                </div>
+                ${isImported ? `<p class="text-[10.5px] text-zinc-600 text-center mt-1">Imported data is currently active.</p>` : ''}`;
+            content.appendChild(panel);
+        }
+
+        function handleJsonImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let parsed = JSON.parse(e.target.result);
+                    if (parsed && parsed.fields && Array.isArray(parsed.fields)) parsed = parsed.fields;
+                    if (!Array.isArray(parsed)) throw new Error('Not an array');
+                    const valid = parsed.filter(x => x && typeof x.label === 'string' && typeof x.value === 'string');
+                    if (!valid.length) throw new Error('No valid fields');
+                    const normalised = valid.map((x, i) => ({
+                        id: x.id || ('imp_' + Date.now() + '_' + i),
+                        label: x.label, value: x.value, hidden: !!x.hidden
+                    }));
+                    saveAll(normalised);
+                    setImportedFlag(true);
+                    renderMainCards();
+                    renderSection('import');
+                    showToast(`Imported ${normalised.length} field${normalised.length !== 1 ? 's' : ''}!`, '#38bdf8');
+                } catch {
+                    showToast('Invalid JSON file', '#ef4444');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function removeImportedData() {
+            if (!loadImportedFlag()) return;
+            localStorage.removeItem(STORAGE_KEY);
+            setImportedFlag(false);
+            renderMainCards();
+            renderSection('import');
+            showToast('Restored default fields', '#a78bfa');
+        }
+
+        /* ══════════════════════════════
+           EXPORT SECTION
+        ══════════════════════════════ */
+        function renderExportSection(content) {
+            const fields = loadData();
+            const panel = document.createElement('div');
+            panel.className = 'tab-panel';
+            panel.innerHTML = `
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:0.75rem;padding:0.75rem 0.85rem;margin-bottom:0.25rem;">
+                    <p class="text-zinc-400 text-[11.5px] leading-relaxed">
+                        Exports <span style="color:#34d399;font-weight:600;">${fields.length} field${fields.length !== 1 ? 's' : ''}</span> (including hidden) as a
+                        <code style="background:#27272a;padding:1px 5px;border-radius:3px;font-size:10.5px;">.json</code> file you can reimport or back up.
+                    </p>
+                </div>
+                <div class="action-card" onclick="doExportJson()">
+                    <div class="action-icon" style="background:#1a2820;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#34d399" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0l-4 4m4-4l4 4"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="action-title">Export as JSON File</div>
+                        <div class="action-desc">Download all fields to your device</div>
+                    </div>
+                    <svg class="w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:0.75rem;padding:0.65rem 0.85rem;margin-top:0.15rem;">
+                    <p class="text-zinc-600 text-[10.5px] mb-1.5 font-medium uppercase tracking-wide">Preview · ${fields.length} fields</p>
+                    <div style="display:flex;flex-direction:column;gap:0.3rem;max-height:190px;overflow-y:auto;">
+                        ${fields.map(f => `
+                        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.28rem 0;border-bottom:1px solid #27272a22;">
+                            <span style="width:6px;height:6px;border-radius:50%;background:${f.hidden ? '#6366f1' : '#22c55e'};flex-shrink:0;margin-top:1px;"></span>
+                            <span class="text-zinc-500 text-[10.5px]" style="width:78px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(f.label)}</span>
+                            <span class="text-zinc-300 text-[11px] font-medium" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(f.value)}</span>
+                            ${f.hidden ? '<span style="font-size:9px;color:#818cf8;background:#1e1b4b;padding:1px 5px;border-radius:3px;flex-shrink:0;">hidden</span>' : ''}
+                        </div>`).join('')}
+                    </div>
+                    <p class="text-zinc-700 text-[9.5px] mt-2">● green = visible &nbsp;·&nbsp; ● purple = hidden</p>
+                </div>`;
+            content.appendChild(panel);
+        }
+
+        function doExportJson() {
+            const fields = loadData();
+            const json = JSON.stringify({ fields }, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `personal-details-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+            showToast(`Exported ${fields.length} fields`, '#34d399');
+        }
+
+        /* ── Copy (main page) ── */
+        function copyToClipboard(id, btn) {
+            const text = document.getElementById('val-' + id).innerText.trim();
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span>Copied!</span>`;
+                btn.style.background = '#22c55e';
+                setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 1800);
+            });
+        }
+
+        /* ── Copy (hidden section) ── */
+        function copyHiddenField(id, btn) {
+            const field = loadData().find(f => f.id === id);
+            if (!field) return;
+            navigator.clipboard.writeText(field.value).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span>Copied!</span>`;
+                btn.style.background = '#166534'; btn.style.color = '#bbf7d0';
+                setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 1800);
+            });
+        }
+
+        /* ── Main cards ── */
+        function renderMainCards() {
+            const data = loadData().filter(f => !f.hidden);
+            const container = document.getElementById('info-container');
+            container.innerHTML = '';
+            data.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card rounded-xl p-3 flex items-center gap-3';
+                card.innerHTML = `
+                    <div class="w-28 flex-shrink-0">
+                        <p class="text-zinc-400 text-xs font-medium">${escHtml(item.label)}</p>
+                    </div>
+                    <div id="val-${item.id}" class="value-box flex-1 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white overflow-hidden text-ellipsis whitespace-nowrap">
+                        ${escHtml(item.value)}
+                    </div>
+                    <button onclick="copyToClipboard('${item.id}', this)" class="copy-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v1"></path>
+                        </svg>
+                        <span>Copy</span>
+                    </button>`;
+                container.appendChild(card);
+            });
+        }
+
+        function escHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        window.onload = renderMainCards;
+    </script>
+</body>
+</html>
